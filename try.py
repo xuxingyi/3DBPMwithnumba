@@ -7,3 +7,6 @@ BPM1 = f['Waveforms']['Channel 1']['Channel 1Data'][()]
 
 
 f.close()
+
+for a1 in a:
+    a1 = a1+5
