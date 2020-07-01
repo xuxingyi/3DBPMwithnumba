@@ -12,7 +12,6 @@ def peak(bpm):
         if not flag_for_baseline:
             if (max(bpm[i * 100:(i + 1) * 100]) -
                     min(bpm[i * 100:(i + 1) * 100])) < 4000:
-                #print(flag_for_baseline)
                 flag_for_baseline = True
         elif (max(bpm[i * 100:(i + 1) * 100]) - min(bpm[i * 100:(i + 1) * 100])) > 4000:
             for k in range(270):
@@ -23,6 +22,7 @@ def peak(bpm):
                     break
             break
     return peak_index
+
 
 def baseline(bpm):
     flag_for_baseline = False
@@ -54,20 +54,19 @@ def calculate_t_by_bunchnumbers(data, t):
     n = len(scan_turn_num)
     for j in range(n):
         turn_num = scan_turn_num[j]
-        data_index_s = np.floor(np.arange(turn_num) * 720 *
-                              t).astype("int32")
+        data_index_s = np.floor(np.arange(turn_num) * 720 * t).astype("int32")
         data_index_e = data_index_s + BunchSize
         # collect specified bunch data together
         bunch_data_first = data[data_index_s[0]:data_index_e[0]]
         bunch_data_end = data[data_index_s[turn_num - 1]:data_index_e[turn_num - 1]]
         # find the peak index for each turn of this bunch
-        IndEnd = np.argmin(bunch_data_end)
-        IndFirst = np.argmin(bunch_data_first)
-        Peak1Index = IndFirst + data_index_s[0] - 1
-        PeakEndIndex = IndEnd + data_index_s[-1] - 1
+        ind_end = np.argmin(bunch_data_end)
+        ind_first = np.argmin(bunch_data_first)
+        peak1_index = ind_first + data_index_s[0] - 1
+        peak_end_index = ind_end + data_index_s[-1] - 1
         # calculate the T using peak index
-        t = (PeakEndIndex - Peak1Index) / 720 / (turn_num - 1)
-    return(t)
+        t = (peak_end_index - peak1_index) / 720 / (turn_num - 1)
+    return t
 
 
 
@@ -92,6 +91,7 @@ if __name__ == '__main__':
     BunchIndex = 0
     # define the data index for the first bunch and the dirst turn
     DataIndexStart = BunchIndex * BunchSize
+
     T = calculate_t_by_bunchnumbers(Data, T)
 
 

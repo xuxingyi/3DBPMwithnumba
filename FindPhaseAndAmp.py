@@ -7,20 +7,20 @@ from scipy import signal
 import h5py
 from numba import njit, prange
 
-@njit
-def find_phase_amp(data, filling1, lut, lut_len, lut_start ,n , t, phasebalance):
+@njit(parallel=True)
+def find_phase_amp(data, filling1, lut, lut_len, lut_start ,n , t, phasebalance, lut_shift):
     bunchindexscan = np.arange(720)
     bunchsize = 40
     #turnnum = 7000
     turnnum = int(np.floor(len(data) / 720 / t)) - 1
-    lutmatrix = np.zeros((40, lut_len))
-    bunchdata = np.zeros((40, turnnum))
-    bunchphase0 = np.zeros(turnnum)
-    bunchphasefit = np.zeros(turnnum)
-    bunchdatafit = np.zeros((40, turnnum))
-    bunchphase = np.zeros((turnnum, n))
-    bunchamp = np.zeros((n, turnnum))
-    tmp3 = np.zeros(2000)
+    lutmatrix = np.empty((40, lut_len))
+    bunchdata = np.empty((40, turnnum))
+    bunchphase0 = np.empty(turnnum)
+    bunchphasefit = np.empty(turnnum)
+    bunchdatafit = np.empty((40, turnnum))
+    bunchphase = np.empty((turnnum, n))
+    bunchamp = np.empty((n, turnnum))
+    tmp3 = np.empty(2000)
     for j in range(720):
         print(j)
         if (filling1[j] == 1):
@@ -46,14 +46,14 @@ def find_phase_amp(data, filling1, lut, lut_len, lut_start ,n , t, phasebalance)
                 bunchphase0[i] = (dataindexs[i] - i * t * 720 - bunchindex * t) * 50
                 datamatrix = np.repeat(bunchdata[:,i],lut_len).reshape(40,2000)
                 correlations = lutmatrix * datamatrix
-                for nm in range(2000):
+                for nm in prange(2000):
                     tmp3[nm] = np.mean(correlations[:,nm])
                 #tmp3 = np.mean(correlations, axis=0)
                 ind = np.argmax(tmp3)
                 # print("ind=", ind)
                 bunchdatafit[:, i] = lutmatrix[:, ind]
                 bunchphasefit[i] = ind * 0.1
-                bunchphase[i, j] = bunchphase0[i] - bunchphasefit[i] - phasebalance[bunchindex]
+                bunchphase[i, j] = bunchphase0[i] - bunchphasefit[i] - phasebalance[bunchindex] + lut_shift[bunchindex]
                 sizen = 40
                 k1 = np.sum(bunchdatafit[:, i]* bunchdata[:, i])
                 k2 = np.sum(bunchdatafit[:, i])
@@ -78,6 +78,8 @@ BPM3 = f['Waveforms']['Channel 3']['Channel 3Data'][()].astype("int32")
 T = np.load("T.npy")
 LUT1 = np.load("LUT1.npy")
 LUT2 = np.load("LUT2.npy")
+LUT1_shift = np.load("LUT1_shift.npy")
+LUT2_shift = np.load("LUT2_shift.npy")
 PhaseBalance = np.load("PhaseBalance.npy")
 filling = np.zeros(720,)
 for i in range(720):
@@ -125,6 +127,7 @@ BunchIndexScan = Filling
 # copy raw data, processing pickup #1
 Data = BPM1[PeakIndex - 10:].copy()
 LUT = LUT1
+LUT_shift = LUT1_shift
 # remove DC offset
 Baseline = np.mean(Data[BaselineIndex], dtype="float64")
 Data = Data - Baseline
@@ -132,8 +135,31 @@ Data = Data - Baseline
 N = len(BunchIndexScan)
 LUTlength = 2000
 LUTstart = 18000
+bunchphase1, bunchamp1 = find_phase_amp(Data, filling, LUT, LUTlength, LUTstart, N, T, PhaseBalance, LUT_shift)
 
-bunchphase1, bunchamp1 = find_phase_amp(Data, filling, LUT, LUTlength, LUTstart, N, T, PhaseBalance)
+# copy raw data, processing pickup #1
+Data = BPM3[PeakIndex - 10:].copy()
+LUT = LUT2
+LUT_shift = LUT2_shift
+# remove DC offset
+Baseline = np.mean(Data[BaselineIndex], dtype="float64")
+Data = Data - Baseline
+# for loop to process all defined bunch
+N = len(BunchIndexScan)
+LUTlength = 2000
+LUTstart = 18000
+bunchphase3, bunchamp3 = find_phase_amp(Data, filling, LUT, LUTlength, LUTstart, N, T, PhaseBalance, LUT_shift)
+
+np.save("BunchPhase1", bunchphase1)
+np.save("BunchPhase3", bunchphase3)
+np.save("BunchAmp1", bunchamp1)
+np.save("BunchAmp3", bunchamp3)
+
+
+
+
+
+
 TurnNum = np.floor(len(Data) / 720 / T).astype("int32") - 1
 LutMatrix = np.zeros((40, LUTlength)).astype("float64")
 BunchData = np.zeros((40, TurnNum)).astype("float64")
